@@ -8,15 +8,13 @@ Artificial intelligence should be made accessible to all. To this end, we provid
 
 ## Class Information
 
-* [Fall 2024 Syllabus](/pdf/NNsyllabus.pdf)
-* **Location:** Davis-Shaughnessy Hall 171
-* **Time:** M 6:00pm-9:15pm
-* **Office hours:** MW 2:00pm-3:00pm & by appointment
-* **Discord:** [discord.gg/SsrNPEeP2P](https://discord.gg/SsrNPEeP2P)
-* **GitHub Classroom:** [classroom.github.com](https://classroom.github.com)
+* **Syllabus:** [Fall 2025](/pdf/NNsyllabus.pdf)
+* **Discord:** [Econ Hub](https://discord.gg/SsrNPEeP2P)
+* **YouTube:** [Business School 101](https://www.youtube.com/@BusinessSchool101)
 
 ## Lecture Slides
 
+* [Getting Started with AI Agents](https://github.com/econdojo/blog/blob/main/doc/AIagent.pdf)
 * [Lecture 0: Python Tutorial](/pdf/NNslides0.pdf)
 * [Lecture 1: Linear Classification](/pdf/NNslides1.pdf)
 * [Lecture 2: Neural Networks](/pdf/NNslides2.pdf)
