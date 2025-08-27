@@ -45,7 +45,7 @@ style: |
     margin: 12px 0;
     border: 1px solid #ddd;
     font-family: 'Courier New', monospace;
-    font-size: 18px;
+    font-size: 23px;
     line-height: 1.4;
   }
   table {
