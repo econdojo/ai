@@ -7,7 +7,7 @@ paginate: true
 backgroundColor: '#f4f6fa'
 backgroundImage: url('https://marp.app/assets/hero-background.svg')
 header: 'Lecture 1: Linear Classification'
-footer: 'Fei Tan | Made on Earth by humans.'
+footer: 'Fei Tan | Understand the Universe.'
 style: |
   .logo {
     vertical-align: -0.2em;
