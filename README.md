@@ -14,7 +14,7 @@ Artificial intelligence should be made accessible to all. To this end, we provid
 
 ## Lecture Slides
 
-* [Getting Started with AI Agents](https://github.com/econdojo/blog/blob/main/doc/agent.pdf)
+* [Getting Started with AI Agents](https://github.com/econdojo/papers/blob/main/pdf/agent.pdf)
 * [Lecture 0: Python Tutorial](/pdf/lec0.pdf)
 * [Lecture 1: Linear Classification](/pdf/lec1.pdf)
 * [Lecture 2: Neural Networks](/pdf/lec2.pdf)
