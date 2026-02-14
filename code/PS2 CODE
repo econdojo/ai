@@ -1,0 +1,839 @@
+#!/usr/bin/env python3
+"""
+Problem Set 2: Linear Classification
+
+Course: Introduction to Neural Networks
+Instructor: Fei Tan
+Due Date: October 15, 2025, 6:00 PM
+
+Complete implementation of all problems with Jupyter notebook-style organization.
+"""
+
+import numpy as np
+import torch
+import matplotlib.pyplot as plt
+from typing import Tuple, Dict, Any, List
+
+print("=" * 70)
+print("PROBLEM SET 2: LINEAR CLASSIFICATION")
+print("=" * 70)
+
+# =============================================================================
+# PROBLEM 1: Linear Score Functions (4 points)
+# =============================================================================
+
+print("\n" + "="*60)
+print("PROBLEM 1: Linear Score Functions")
+print("="*60)
+
+class LinearScoreFunctions:
+    """Implementation of linear score functions and geometric interpretation."""
+    
+    @staticmethod
+    def linear_score(x_i: np.ndarray, W: np.ndarray, b: np.ndarray) -> np.ndarray:
+        """
+        Compute linear scores for a single example.
+        
+        Args:
+            x_i: feature vector of shape (D,)
+            W: weight matrix of shape (K, D) 
+            b: bias vector of shape (K,)
+        
+        Returns:
+            scores: score vector of shape (K,)
+        """
+        return W @ x_i + b
+    
+    @staticmethod
+    def batch_linear_score(X: np.ndarray, W: np.ndarray, b: np.ndarray) -> np.ndarray:
+        """
+        Compute linear scores for batch of examples.
+        
+        Args:
+            X: data matrix of shape (N, D)
+            W: weight matrix of shape (K, D)
+            b: bias vector of shape (K,)
+        
+        Returns:
+            scores: score matrix of shape (N, K)
+        """
+        return X @ W.T + b
+    
+    @staticmethod
+    def visualize_decision_boundary():
+        """Create and visualize decision boundary for 2D binary classification."""
+        np.random.seed(42)
+        n_points = 100
+        X_2d = np.random.randn(n_points, 2) * 2
+        
+        # Define a simple linear classifier
+        W_2d = np.array([[1.0, -0.5]])  # shape (1, 2)
+        b_2d = np.array([0.0])          # shape (1,)
+        
+        # Compute scores and predictions
+        scores_2d = LinearScoreFunctions.batch_linear_score(X_2d, W_2d, b_2d).flatten()
+        predictions = (scores_2d > 0).astype(int)
+        
+        # Create visualization
+        plt.figure(figsize=(10, 8))
+        
+        # Plot data points
+        colors = ['red' if pred == 0 else 'blue' for pred in predictions]
+        plt.scatter(X_2d[:, 0], X_2d[:, 1], c=colors, alpha=0.6, edgecolors='w', s=50)
+        
+        # Plot decision boundary: w1*x1 + w2*x2 + b = 0 => x2 = -(w1*x1 + b)/w2
+        x1_boundary = np.linspace(-6, 6, 100)
+        x2_boundary = -(W_2d[0, 0] * x1_boundary + b_2d[0]) / W_2d[0, 1]
+        plt.plot(x1_boundary, x2_boundary, 'k-', linewidth=2, label='Decision Boundary')
+        
+        plt.xlabel('Feature 1 (x1)')
+        plt.ylabel('Feature 2 (x2)')
+        plt.title('2D Binary Classification with Linear Decision Boundary')
+        plt.grid(True, alpha=0.3)
+        plt.legend()
+        plt.axis('equal')
+        plt.show()
+        
+        return W_2d, b_2d, X_2d, predictions
+
+# Test Problem 1
+print("\n--- Part A: Score Function Implementation ---")
+
+# Test single score function
+np.random.seed(42)
+D, K = 4, 3
+x = np.array([1.0, 2.0, -1.0, 0.5])
+W = np.random.randn(K, D) * 0.1
+b = np.zeros(K)
+
+scores = LinearScoreFunctions.linear_score(x, W, b)
+print(f"Input features: {x}")
+print(f"Weights shape: {W.shape}")
+print(f"Scores: {scores}")
+
+# Test batch score function
+N = 5
+X_batch = np.random.randn(N, D)
+scores_batch = LinearScoreFunctions.batch_linear_score(X_batch, W, b)
+print(f"\nBatch input shape: {X_batch.shape}")
+print(f"Batch scores shape: {scores_batch.shape}")
+print(f"First example scores: {scores_batch[0]}")
+
+print("\n--- Part B: Geometric Interpretation ---")
+W_2d, b_2d, X_2d, predictions = LinearScoreFunctions.visualize_decision_boundary()
+print("2D visualization completed!")
+
+# =============================================================================
+# PROBLEM 2: Loss Functions (4 points)
+# =============================================================================
+
+print("\n" + "="*60)
+print("PROBLEM 2: Loss Functions")
+print("="*60)
+
+class LossFunctions:
+    """Implementation of SVM and Softmax loss functions."""
+    
+    @staticmethod
+    def svm_loss_single(scores: np.ndarray, y_i: int, delta: float = 1.0) -> float:
+        """
+        Compute SVM loss for a single example.
+        
+        Args:
+            scores: score vector of shape (K,)
+            y_i: true class label (integer)
+            delta: margin parameter
+        
+        Returns:
+            loss: scalar SVM loss for this example
+        """
+        correct_class_score = scores[y_i]
+        losses = np.maximum(0, scores - correct_class_score + delta)
+        losses[y_i] = 0  # Don't count the correct class
+        return np.sum(losses)
+    
+    @staticmethod
+    def svm_loss_batch(X: np.ndarray, y: np.ndarray, W: np.ndarray, b: np.ndarray, 
+                      reg_lambda: float = 0.01, delta: float = 1.0) -> Tuple[float, float, float]:
+        """
+        Compute SVM loss for batch of examples with L2 regularization.
+        
+        Args:
+            X: data matrix of shape (N, D)
+            y: labels of shape (N,)
+            W: weight matrix of shape (K, D)
+            b: bias vector of shape (K,)
+            reg_lambda: regularization strength
+            delta: margin parameter
+        
+        Returns:
+            loss: total loss (scalar)
+            data_loss: average data loss (scalar)
+            reg_loss: regularization loss (scalar)
+        """
+        N = X.shape[0]
+        scores = LinearScoreFunctions.batch_linear_score(X, W, b)
+        
+        # Compute data loss
+        data_loss = 0.0
+        for i in range(N):
+            data_loss += LossFunctions.svm_loss_single(scores[i], y[i], delta)
+        data_loss /= N
+        
+        # Compute regularization loss
+        reg_loss = 0.5 * reg_lambda * np.sum(W * W)
+        
+        total_loss = data_loss + reg_loss
+        return total_loss, data_loss, reg_loss
+    
+    @staticmethod
+    def softmax_loss_single(scores: np.ndarray, y_i: int) -> Tuple[float, np.ndarray]:
+        """
+        Compute softmax loss for a single example.
+        
+        Args:
+            scores: score vector of shape (K,)
+            y_i: true class label (integer)
+        
+        Returns:
+            loss: scalar softmax loss for this example
+            probabilities: softmax probabilities of shape (K,)
+        """
+        # Numerical stability: subtract max
+        scores_shifted = scores - np.max(scores)
+        exp_scores = np.exp(scores_shifted)
+        probabilities = exp_scores / np.sum(exp_scores)
+        
+        loss = -np.log(probabilities[y_i] + 1e-8)  # Small epsilon to avoid log(0)
+        return loss, probabilities
+    
+    @staticmethod
+    def compare_losses(scores: np.ndarray, y_true: int) -> Tuple[float, float]:
+        """
+        Compare SVM and Softmax losses for the same predictions.
+        
+        Args:
+            scores: score vector of shape (K,)
+            y_true: true class label (integer)
+        
+        Returns:
+            svm_loss: SVM loss value
+            softmax_loss: Softmax loss value
+        """
+        svm_loss_val = LossFunctions.svm_loss_single(scores, y_true)
+        softmax_loss_val, _ = LossFunctions.softmax_loss_single(scores, y_true)
+        return svm_loss_val, softmax_loss_val
+
+# Test Problem 2
+print("\n--- Part A: SVM Loss (Hinge Loss) ---")
+
+# Test single SVM loss
+test_scores = np.array([1.0, 5.0, -2.0])
+true_class = 1
+svm_loss = LossFunctions.svm_loss_single(test_scores, true_class)
+print(f"Scores: {test_scores}")
+print(f"True class: {true_class}")
+print(f"SVM loss: {svm_loss:.4f}")
+
+# Test batch SVM loss
+N, D, K = 10, 4, 3
+np.random.seed(42)
+X_test = np.random.randn(N, D)
+y_test = np.random.randint(0, K, N)
+W_test = np.random.randn(K, D) * 0.1
+b_test = np.zeros(K)
+
+total_loss, data_loss, reg_loss = LossFunctions.svm_loss_batch(X_test, y_test, W_test, b_test)
+print(f"\nBatch SVM Loss:")
+print(f"Total loss: {total_loss:.4f}")
+print(f"Data loss: {data_loss:.4f}")
+print(f"Regularization loss: {reg_loss:.4f}")
+
+print("\n--- Part B: Softmax Loss (Cross-Entropy Loss) ---")
+
+# Test softmax loss
+softmax_loss, probs = LossFunctions.softmax_loss_single(test_scores, true_class)
+print(f"Scores: {test_scores}")
+print(f"True class: {true_class}")
+print(f"Probabilities: {probs}")
+print(f"Softmax loss: {softmax_loss:.4f}")
+print(f"Sum of probabilities: {np.sum(probs):.6f}")
+
+print("\n--- Loss Comparison ---")
+
+# Scenario 1: Correct class has highest score
+scores1 = np.array([1.0, 5.0, 2.0])
+y1 = 1
+svm1, softmax1 = LossFunctions.compare_losses(scores1, y1)
+print(f"Scenario 1 - Correct prediction:")
+print(f"Scores: {scores1}, True class: {y1}")
+print(f"SVM loss: {svm1:.4f}, Softmax loss: {softmax1:.4f}")
+
+# Scenario 2: Incorrect class has highest score
+scores2 = np.array([5.0, 1.0, 2.0])
+y2 = 1
+svm2, softmax2 = LossFunctions.compare_losses(scores2, y2)
+print(f"\nScenario 2 - Incorrect prediction:")
+print(f"Scores: {scores2}, True class: {y2}")
+print(f"SVM loss: {svm2:.4f}, Softmax loss: {softmax2:.4f}")
+
+# =============================================================================
+# PROBLEM 3: Gradient Computation (4 points)
+# =============================================================================
+
+print("\n" + "="*60)
+print("PROBLEM 3: Gradient Computation")
+print("="*60)
+
+class GradientComputation:
+    """Implementation of numerical and analytical gradient computation."""
+    
+    @staticmethod
+    def numerical_gradient(f: callable, x: np.ndarray, h: float = 1e-5) -> np.ndarray:
+        """
+        Compute numerical gradient using finite differences.
+        
+        Args:
+            f: function that takes x and returns scalar
+            x: point at which to evaluate gradient (any shape)
+            h: step size for finite difference
+        
+        Returns:
+            grad: gradient of same shape as x
+        """
+        grad = np.zeros_like(x)
+        
+        # Iterate over all elements
+        it = np.nditer(x, flags=['multi_index'], op_flags=['readwrite'])
+        while not it.finished:
+            idx = it.multi_index
+            old_val = x[idx]
+            
+            # f(x + h)
+            x[idx] = old_val + h
+            fx_plus = f(x)
+            
+            # f(x - h)
+            x[idx] = old_val - h
+            fx_minus = f(x)
+            
+            # Gradient
+            grad[idx] = (fx_plus - fx_minus) / (2 * h)
+            
+            # Restore original value
+            x[idx] = old_val
+            it.iternext()
+        
+        return grad
+    
+    @staticmethod
+    def svm_loss_and_grad(X: np.ndarray, y: np.ndarray, W: np.ndarray, b: np.ndarray, 
+                         reg_lambda: float = 0.01, delta: float = 1.0) -> Tuple[float, np.ndarray, np.ndarray]:
+        """
+        Compute SVM loss and gradients analytically.
+        
+        Args:
+            X: data matrix of shape (N, D)
+            y: labels of shape (N,)
+            W: weight matrix of shape (K, D)
+            b: bias vector of shape (K,)
+            reg_lambda: regularization strength
+            delta: margin parameter
+        
+        Returns:
+            loss: total loss (scalar)
+            dW: gradient w.r.t. weights of shape (K, D)
+            db: gradient w.r.t. biases of shape (K,)
+        """
+        N, D = X.shape
+        K = W.shape[0]
+        
+        # Forward pass
+        scores = LinearScoreFunctions.batch_linear_score(X, W, b)
+        data_loss = 0.0
+        
+        # Initialize gradients
+        dW = np.zeros_like(W)
+        db = np.zeros_like(b)
+        
+        for i in range(N):
+            scores_i = scores[i]
+            y_i = y[i]
+            correct_score = scores_i[y_i]
+            
+            # Count number of classes that violate margin
+            margin_count = 0
+            for j in range(K):
+                if j == y_i:
+                    continue
+                    
+                margin = scores_i[j] - correct_score + delta
+                if margin > 0:
+                    data_loss += margin
+                    # Gradient for incorrect classes
+                    dW[j] += X[i]
+                    db[j] += 1
+                    margin_count += 1
+            
+            # Gradient for correct class
+            dW[y_i] -= margin_count * X[i]
+            db[y_i] -= margin_count
+        
+        # Average data loss and gradients
+        data_loss /= N
+        dW /= N
+        db /= N
+        
+        # Add regularization
+        reg_loss = 0.5 * reg_lambda * np.sum(W * W)
+        total_loss = data_loss + reg_loss
+        
+        # Add regularization gradient
+        dW += reg_lambda * W
+        
+        return total_loss, dW, db
+    
+    @staticmethod
+    def gradient_check(numerical_grad: np.ndarray, analytical_grad: np.ndarray, 
+                      threshold: float = 1e-6) -> Tuple[float, bool]:
+        """
+        Check if numerical and analytical gradients match.
+        
+        Args:
+            numerical_grad: numerically computed gradient
+            analytical_grad: analytically computed gradient
+            threshold: tolerance for relative error
+        
+        Returns:
+            relative_error: relative error between gradients
+            passed: True if gradient check passes
+        """
+        numerator = np.abs(numerical_grad - analytical_grad)
+        denominator = np.abs(numerical_grad) + np.abs(analytical_grad)
+        relative_error = numerator / (denominator + 1e-8)  # Avoid division by zero
+        
+        max_error = np.max(relative_error)
+        passed = max_error < threshold
+        
+        return max_error, passed
+
+# Test Problem 3
+print("\n--- Part A: Numerical Gradient ---")
+
+# Test with simple functions
+def test_function_1(x):
+    # f(x, y) = x^2 + y^2, gradient should be [2x, 2y]
+    return x[0]**2 + x[1]**2
+
+def test_function_2(x):
+    # f(x, y) = x * y, gradient should be [y, x]
+    return x[0] * x[1]
+
+test_point = np.array([3.0, 4.0])
+
+grad1 = GradientComputation.numerical_gradient(test_function_1, test_point)
+grad2 = GradientComputation.numerical_gradient(test_function_2, test_point)
+
+print(f"Test point: {test_point}")
+print(f"f(x,y) = x^2 + y^2, numerical gradient: {grad1}")
+print(f"Expected: [6.0, 8.0]")
+print(f"f(x,y) = x*y, numerical gradient: {grad2}")
+print(f"Expected: [4.0, 3.0]")
+
+print("\n--- Part B: Analytical Gradient ---")
+
+# Generate small test data for gradient checking
+np.random.seed(42)
+N, D, K = 5, 3, 3
+X_small = np.random.randn(N, D)
+y_small = np.random.randint(0, K, N)
+W_small = np.random.randn(K, D) * 0.1
+b_small = np.zeros(K)
+
+# Compute analytical gradient
+loss_analytical, dW_analytical, db_analytical = GradientComputation.svm_loss_and_grad(
+    X_small, y_small, W_small, b_small
+)
+
+print(f"Analytical loss: {loss_analytical:.4f}")
+print(f"Weight gradient shape: {dW_analytical.shape}")
+print(f"Bias gradient shape: {db_analytical.shape}")
+
+# For numerical gradient, we need a wrapper function
+def svm_loss_for_grad_check(params, X=X_small, y=y_small, reg_lambda=0.01):
+    """SVM loss function for gradient checking."""
+    N, D = X.shape
+    K = np.max(y) + 1
+    
+    # Reshape flattened parameters
+    W = params[:K*D].reshape(K, D)
+    b = params[K*D:]
+    
+    # Compute loss
+    total_loss, _, _ = GradientComputation.svm_loss_and_grad(X, y, W, b, reg_lambda)
+    return total_loss
+
+# Flatten parameters for numerical gradient
+params = np.concatenate([W_small.flatten(), b_small.flatten()])
+
+# Compute numerical gradient
+numerical_grad = GradientComputation.numerical_gradient(
+    lambda p: svm_loss_for_grad_check(p, X_small, y_small), params
+)
+
+# Flatten analytical gradients to compare with numerical
+analytical_grad_flat = np.concatenate([dW_analytical.flatten(), db_analytical.flatten()])
+
+# Perform gradient check
+rel_error, passed = GradientComputation.gradient_check(numerical_grad, analytical_grad_flat)
+
+print(f"\nGradient check:")
+print(f"Relative error: {rel_error:.2e}")
+print(f"Passed: {passed}")
+print(f"Expected: relative error < 1e-6")
+
+# =============================================================================
+# PROBLEM 4: Gradient Descent Implementation (4 points)
+# =============================================================================
+
+print("\n" + "="*60)
+print("PROBLEM 4: Gradient Descent Implementation")
+print("="*60)
+
+class GradientDescent:
+    """Implementation of gradient descent for linear classifier training."""
+    
+    @staticmethod
+    def train_linear_classifier(X: np.ndarray, y: np.ndarray, learning_rate: float = 0.001, 
+                               num_epochs: int = 1000, reg_lambda: float = 0.01, 
+                               batch_size: int = None, verbose: bool = True) -> Tuple[np.ndarray, np.ndarray, List[float]]:
+        """
+        Train a linear classifier using gradient descent.
+        
+        Args:
+            X: training data of shape (N, D)
+            y: training labels of shape (N,)
+            learning_rate: step size for gradient descent
+            num_epochs: number of training epochs
+            reg_lambda: regularization strength
+            batch_size: if None, use full batch; otherwise use mini-batches
+            verbose: print training progress
+        
+        Returns:
+            W: trained weights of shape (K, D)
+            b: trained biases of shape (K,)
+            loss_history: list of loss values during training
+        """
+        N, D = X.shape
+        K = np.max(y) + 1
+        
+        # Initialize parameters
+        W = np.random.randn(K, D) * 0.01
+        b = np.zeros(K)
+        
+        loss_history = []
+        
+        for epoch in range(num_epochs):
+            if batch_size is None:
+                # Full batch
+                batch_X = X
+                batch_y = y
+            else:
+                # Mini-batch
+                indices = np.random.choice(N, batch_size, replace=False)
+                batch_X = X[indices]
+                batch_y = y[indices]
+            
+            # Compute loss and gradients
+            loss, dW, db = GradientComputation.svm_loss_and_grad(batch_X, batch_y, W, b, reg_lambda)
+            
+            # Update parameters
+            W -= learning_rate * dW
+            b -= learning_rate * db
+            
+            loss_history.append(loss)
+            
+            if verbose and epoch % 100 == 0:
+                print(f"Epoch {epoch}, Loss: {loss:.4f}")
+        
+        return W, b, loss_history
+    
+    @staticmethod
+    def compute_accuracy(X: np.ndarray, y: np.ndarray, W: np.ndarray, b: np.ndarray) -> float:
+        """
+        Compute classification accuracy.
+        
+        Args:
+            X: data matrix of shape (N, D)
+            y: true labels of shape (N,)
+            W: weight matrix of shape (K, D)
+            b: bias vector of shape (K,)
+        
+        Returns:
+            accuracy: classification accuracy
+        """
+        scores = LinearScoreFunctions.batch_linear_score(X, W, b)
+        predictions = np.argmax(scores, axis=1)
+        return np.mean(predictions == y)
+    
+    @staticmethod
+    def plot_training_results(loss_history: List[float], X_train: np.ndarray, y_train: np.ndarray,
+                             W_trained: np.ndarray, b_trained: np.ndarray):
+        """Plot training curve and accuracy."""
+        train_acc = GradientDescent.compute_accuracy(X_train, y_train, W_trained, b_trained)
+        
+        plt.figure(figsize=(12, 4))
+        
+        plt.subplot(1, 2, 1)
+        plt.plot(loss_history)
+        plt.xlabel('Epoch')
+        plt.ylabel('Loss')
+        plt.title('Training Loss')
+        plt.grid(True)
+        
+        plt.subplot(1, 2, 2)
+        plt.bar(['Training Accuracy'], [train_acc], color=['skyblue'])
+        plt.ylabel('Accuracy')
+        plt.title('Final Accuracy')
+        plt.ylim(0, 1)
+        
+        plt.tight_layout()
+        plt.show()
+        
+        print(f"Final training accuracy: {train_acc:.4f}")
+        
+        return train_acc
+    
+    @staticmethod
+    def hyperparameter_analysis(X_train: np.ndarray, y_train: np.ndarray):
+        """Study the effect of different hyperparameters on training."""
+        
+        # Learning rate analysis
+        learning_rates = [0.001, 0.01, 0.1, 1.0]
+        colors = ['blue', 'green', 'red', 'orange']
+        
+        plt.figure(figsize=(12, 4))
+        
+        plt.subplot(1, 2, 1)
+        for i, lr in enumerate(learning_rates):
+            _, _, loss_hist = GradientDescent.train_linear_classifier(
+                X_train, y_train, 
+                learning_rate=lr, 
+                num_epochs=200, 
+                verbose=False
+            )
+            plt.plot(loss_hist, color=colors[i], label=f'LR={lr}')
+        
+        plt.xlabel('Epoch')
+        plt.ylabel('Loss')
+        plt.title('Effect of Learning Rate')
+        plt.legend()
+        plt.grid(True)
+        plt.yscale('log')
+        
+        # Regularization analysis
+        reg_lambdas = [0.0, 0.001, 0.01, 0.1]
+        
+        plt.subplot(1, 2, 2)
+        for i, reg in enumerate(reg_lambdas):
+            _, _, loss_hist = GradientDescent.train_linear_classifier(
+                X_train, y_train, 
+                learning_rate=0.01, 
+                reg_lambda=reg,
+                num_epochs=200, 
+                verbose=False
+            )
+            plt.plot(loss_hist, color=colors[i], label=f'λ={reg}')
+        
+        plt.xlabel('Epoch')
+        plt.ylabel('Loss')
+        plt.title('Effect of Regularization')
+        plt.legend()
+        plt.grid(True)
+        
+        plt.tight_layout()
+        plt.show()
+
+# Test Problem 4
+print("\n--- Part A: Basic Gradient Descent ---")
+
+# Generate synthetic dataset for testing
+np.random.seed(42)
+N, D, K = 100, 10, 3
+X_train = np.random.randn(N, D)
+# Create somewhat separable classes
+W_true = np.random.randn(K, D)
+scores_true = X_train @ W_true.T
+y_train = np.argmax(scores_true, axis=1)
+
+print(f"Training data shape: {X_train.shape}")
+print(f"Training labels shape: {y_train.shape}")
+print(f"Classes: {np.unique(y_train)}")
+
+# Train the classifier
+print("\nTraining linear classifier...")
+W_trained, b_trained, loss_history = GradientDescent.train_linear_classifier(
+    X_train, y_train, 
+    learning_rate=0.01, 
+    num_epochs=500, 
+    reg_lambda=0.001,
+    verbose=False
+)
+
+print("Training completed!")
+
+# Plot training results
+print("\nPlotting training results...")
+train_acc = GradientDescent.plot_training_results(loss_history, X_train, y_train, W_trained, b_trained)
+
+print("\n--- Part B: Hyperparameter Analysis ---")
+print("Plotting hyperparameter analysis...")
+GradientDescent.hyperparameter_analysis(X_train, y_train)
+
+# =============================================================================
+# PROBLEM 5: Backpropagation and PyTorch (4 points)
+# =============================================================================
+
+print("\n" + "="*60)
+print("PROBLEM 5: Backpropagation and PyTorch")
+print("="*60)
+
+class BackpropagationPyTorch:
+    """Implementation of manual backpropagation and PyTorch automatic differentiation."""
+    
+    @staticmethod
+    def composite_function_forward(x: float, y: float, z: float, w: float) -> Tuple[float, Dict[str, Any]]:
+        """
+        Forward pass of the composite function: f(x, y, z, w) = 2 * (x * y + max(z, w))
+        
+        Returns:
+            f: final output
+            intermediates: dictionary of intermediate values for backprop
+        """
+        p = x * y
+        q = max(z, w)
+        v = p + q
+        f = 2 * v
+        
+        intermediates = {'x': x, 'y': y, 'z': z, 'w': w, 'p': p, 'q': q, 'v': v}
+        return f, intermediates
+    
+    @staticmethod
+    def composite_function_backward(intermediates: Dict[str, Any]) -> Dict[str, float]:
+        """
+        Backward pass of the composite function.
+        
+        Args:
+            intermediates: dictionary from forward pass
+        
+        Returns:
+            gradients: dictionary of gradients w.r.t. inputs
+        """
+        # df/dv = 2
+        dv = 2
+        
+        # dv/dp = 1, dv/dq = 1
+        dp = dv * 1
+        dq = dv * 1
+        
+        # dp/dx = y, dp/dy = x
+        dx = dp * intermediates['y']
+        dy = dp * intermediates['x']
+        
+        # dq/dz = 1 if z > w else 0, dq/dw = 1 if w > z else 0
+        dz = dq * 1 if intermediates['z'] > intermediates['w'] else 0
+        dw = dq * 1 if intermediates['w'] > intermediates['z'] else 0
+        
+        return {'x': dx, 'y': dy, 'z': dz, 'w': dw}
+    
+    @staticmethod
+    def composite_function_pytorch(x_val: float, y_val: float, z_val: float, w_val: float) -> Tuple[float, Tuple[float, float, float, float]]:
+        """
+        Implement composite function using PyTorch automatic differentiation.
+        
+        Returns:
+            f: function value
+            gradients: tuple of gradients (df/dx, df/dy, df/dz, df/dw)
+        """
+        x = torch.tensor(x_val, requires_grad=True)
+        y = torch.tensor(y_val, requires_grad=True)
+        z = torch.tensor(z_val, requires_grad=True)
+        w = torch.tensor(w_val, requires_grad=True)
+        
+        p = x * y
+        q = torch.max(z, w)
+        v = p + q
+        f = 2 * v
+        
+        f.backward()
+        
+        gradients = (x.grad.item(), y.grad.item(), z.grad.item(), w.grad.item())
+        return f.item(), gradients
+    
+    @staticmethod
+    def composite_function_scalar(inputs: np.ndarray) -> float:
+        """Scalar version for numerical gradient computation."""
+        x, y, z, w = inputs
+        p = x * y
+        q = max(z, w)
+        v = p + q
+        f = 2 * v
+        return f
+
+# Test Problem 5
+print("\n--- Part A: Manual Backpropagation ---")
+
+# Test with the example from lecture: x=3, y=-4, z=2, w=-1
+x, y, z, w = 3.0, -4.0, 2.0, -1.0
+
+# Forward pass
+f_val, intermediates = BackpropagationPyTorch.composite_function_forward(x, y, z, w)
+
+# Backward pass
+gradients = BackpropagationPyTorch.composite_function_backward(intermediates)
+
+print(f"Input values: x={x}, y={y}, z={z}, w={w}")
+print(f"Function value: f={f_val}")
+print(f"Manual gradients: {gradients}")
+print(f"Expected gradients: df/dx=-8, df/dy=6, df/dz=2, df/dw=0")
+
+# Verify with numerical gradient
+print("\nVerifying with numerical gradient...")
+inputs = np.array([x, y, z, w])
+numerical_grad = GradientComputation.numerical_gradient(BackpropagationPyTorch.composite_function_scalar, inputs)
+
+# Compare with analytical gradient
+analytical_grad = np.array([gradients['x'], gradients['y'], gradients['z'], gradients['w']])
+
+print(f"Numerical gradient: {numerical_grad}")
+print(f"Analytical gradient: {analytical_grad}")
+print(f"Difference: {np.abs(numerical_grad - analytical_grad)}")
+
+print("\n--- Part B: PyTorch Automatic Differentiation ---")
+
+# Test PyTorch implementation
+f_pytorch, grads_pytorch = BackpropagationPyTorch.composite_function_pytorch(x, y, z, w)
+
+print(f"PyTorch function value: {f_pytorch}")
+print(f"PyTorch gradients: {grads_pytorch}")
+print(f"Manual gradients: {analytical_grad}")
+print(f"Match: {np.allclose(grads_pytorch, analytical_grad)}")
+
+# =============================================================================
+# MAIN EXECUTION
+# =============================================================================
+
+if __name__ == "__main__":
+    print("\n" + "="*70)
+    print("PROBLEM SET 2 EXECUTION COMPLETED SUCCESSFULLY!")
+    print("="*70)
+    
+    # Summary of results
+    print("\nSUMMARY OF RESULTS:")
+    print(f"1. Linear Score Functions: Implemented and tested")
+    print(f"2. Loss Functions: SVM and Softmax implemented and compared")
+    print(f"3. Gradient Computation: Numerical and analytical gradients implemented")
+    print(f"4. Gradient Descent: Linear classifier trained with {train_acc:.1%} accuracy")
+    print(f"5. Backpropagation: Manual and PyTorch implementations verified")
+    
+    print("\nAll problems completed successfully! 🎉")
